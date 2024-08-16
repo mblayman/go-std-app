@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"html/template"
 	"log"
 	"net/http"
 )
@@ -32,6 +33,23 @@ func main() {
 		}
 		encoder := json.NewEncoder(w)
 		encoder.Encode(movies)
+	})
+
+	router.HandleFunc("GET /template", func(w http.ResponseWriter, r *http.Request) {
+		base := `
+<html><head><title>testing</title></head>
+<body>{{ block "content" . }}{{end}}</body></html>`
+
+		content := `
+{{ define "content" }}
+<h1>{{.Title}}</h1>
+<p>{{.ReleaseYear}}</p>
+{{ end }}`
+
+		movie := Movie{Title: "The <Shawshank> Redemption", ReleaseYear: 1994}
+		tmpl := template.Must(template.New("base").Parse(base))
+		tmpl = template.Must(tmpl.Parse(content))
+		tmpl.Execute(w, movie)
 	})
 
 	v2 := http.NewServeMux()

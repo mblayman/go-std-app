@@ -2,6 +2,13 @@
 
 Make a Go app using nothing but the standard library
 
+## Run
+
+```
+go run app.go
+# Stop with Ctrl+C
+```
+
 Things to explore:
 
 * Data
