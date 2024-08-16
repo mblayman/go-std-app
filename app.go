@@ -1,6 +1,7 @@
 package main
 
 import (
+	"embed"
 	"encoding/json"
 	"fmt"
 	"html"
@@ -13,6 +14,9 @@ type Movie struct {
 	Title       string `json:"title"`
 	ReleaseYear int    `json:"releaseYear"`
 }
+
+//go:embed static/*
+var content embed.FS
 
 func main() {
 	fmt.Println("Starting server...")
@@ -50,6 +54,12 @@ func main() {
 		tmpl := template.Must(template.New("base").Parse(base))
 		tmpl = template.Must(tmpl.Parse(content))
 		tmpl.Execute(w, movie)
+	})
+
+	router.HandleFunc("GET /static/{path...}", func(w http.ResponseWriter, r *http.Request) {
+		path := r.PathValue("path")
+		data, _ := content.ReadFile(fmt.Sprintf("static/%s", path))
+		w.Write(data)
 	})
 
 	v2 := http.NewServeMux()
