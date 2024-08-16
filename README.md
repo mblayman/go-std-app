@@ -4,10 +4,6 @@ Make a Go app using nothing but the standard library
 
 Things to explore:
 
-* JSON API serialization
-* HTML template
-    * nesting
-    * partials / includes
 * Data
     * no native db option
     * What's up with BoltDB?
