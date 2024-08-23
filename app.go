@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"embed"
 	"encoding/json"
 	"fmt"
@@ -14,9 +15,40 @@ type Movie struct {
 	Title       string `json:"title"`
 	ReleaseYear int    `json:"releaseYear"`
 }
+type contextKey string
+
+const userKey contextKey = "user"
 
 //go:embed static/*
 var content embed.FS
+
+func authMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Pull something from the request, likely a cookie.
+		// Check that thing against the db.
+
+		// For this streaming session, we will pretend that we did the
+		// stuff above and have a valid user.
+		ctx := context.WithValue(r.Context(), userKey, "43")
+
+		fmt.Println("Called the auth middleware")
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
+// adminMiddleware pretends to permit admin users. In this case, admin has an
+// ID of 42.
+func adminMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value(userKey).(string)
+		if userID != "42" {
+			http.Error(w, "Nope", http.StatusForbidden)
+			return
+		}
+		fmt.Println("Called the admin middleware")
+		next.ServeHTTP(w, r)
+	})
+}
 
 func main() {
 	fmt.Println("Starting server...")
@@ -69,9 +101,16 @@ func main() {
 
 	router.Handle("/v2/", http.StripPrefix("/v2", v2))
 
+	admin := http.NewServeMux()
+	admin.HandleFunc("/dashboard", func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte("A secret to everybody but 42"))
+	})
+
+	router.Handle("/admin/", http.StripPrefix("/admin", adminMiddleware(admin)))
+
 	server := http.Server{
 		Addr:    ":8080",
-		Handler: router,
+		Handler: authMiddleware(router),
 	}
 	log.Fatal(server.ListenAndServe())
 }
