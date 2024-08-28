@@ -2,12 +2,16 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"embed"
 	"encoding/json"
 	"fmt"
 	"html"
 	"html/template"
+	"log"
 	"net/http"
+
+	_ "github.com/mattn/go-sqlite3"
 )
 
 type Movie struct {
@@ -50,7 +54,36 @@ func adminMiddleware(next http.Handler) http.Handler {
 	})
 }
 
+func createDb() *sql.DB {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	createTableSQL := `
+	CREATE TABLE IF NOT EXISTS users (
+		id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+		name TEXT,
+		age INTEGER
+	);`
+	_, err = db.Exec(createTableSQL)
+	if err != nil {
+		log.Fatalf("Failed to create table: %v", err)
+	}
+
+	insertUserSQL := `INSERT INTO users (name, age) VALUES (?, ?)`
+	_, err = db.Exec(insertUserSQL, "Alice", 30)
+	if err != nil {
+		log.Fatalf("Failed to insert data: %v", err)
+	}
+
+	return db
+}
+
 func main() {
+	db := createDb()
+	defer db.Close()
+
 	fmt.Println("Starting server...")
 
 	router := http.NewServeMux()
@@ -105,6 +138,28 @@ func main() {
 	})
 
 	router.Handle("/admin/", http.StripPrefix("/admin", adminMiddleware(admin)))
+
+	// Database
+	router.HandleFunc("/db", func(w http.ResponseWriter, r *http.Request) {
+		queryUserSQL := `SELECT id, name, age FROM users`
+		rows, err := db.Query(queryUserSQL)
+		if err != nil {
+			log.Fatalf("Failed to query data: %v", err)
+		}
+		defer rows.Close()
+
+		for rows.Next() {
+			var id int
+			var name string
+			var age int
+			err = rows.Scan(&id, &name, &age)
+			if err != nil {
+				log.Fatalf("Failed to scan row: %v", err)
+			}
+			fmt.Fprintf(w, "ID: %d, Name: %s, Age: %d\n", id, name, age)
+		}
+
+	})
 
 	server := http.Server{
 		Addr:    ":8000",
